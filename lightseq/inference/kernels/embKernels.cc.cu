@@ -88,6 +88,7 @@ __global__ void ker_enc_emb(const T *token_emb, const T *pos_emb,
   int batch_idx, seq_idx, dim_idx;
   decompose_3dim(idx, seq_len, hidden_dim, &batch_idx, &seq_idx, &dim_idx);
   int tokens_idx = batch_idx * seq_len + seq_idx;
+  // token is index in vocabulary
   int token = tokens[tokens_idx];
   float4 value;
 

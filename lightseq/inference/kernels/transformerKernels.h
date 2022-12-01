@@ -20,6 +20,10 @@ template <typename T>
 void ker_norm_layer_launcher(int token_num, int hidden_size,
                              cudaStream_t stream, T* matrix, const T* scale,
                              const T* bias, int max_thread_per_block);
+template <typename T>
+void ker_residual_launcher(int token_num, int hidden_size,
+                                    cudaStream_t stream, T* input, T* output,
+                                    const T* residual_bias, const int max_thread_per_block);
 
 template <typename T>
 void ker_norm_layer_resual_launcher(int token_num, int hidden_size,

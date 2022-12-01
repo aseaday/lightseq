@@ -167,10 +167,17 @@ Encoder self attention
 template <OperationType OpType_>
 void Encoder<OpType_>::self_attention() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
-  ker_norm_layer_resual_launcher<_DataType>(
-      _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_q,
-      _p_d_enc_wei[_weight_offset], _p_d_enc_wei[_weight_offset + 1],
-      _p_d_enc_wei[_weight_offset + 5], _max_thread_per_block, _tw._is_post_ln);
+  // ker_norm_layer_resual_launcher<_DataType>(
+  //     _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_q,
+  //     _p_d_enc_wei[_weight_offset], _p_d_enc_wei[_weight_offset + 1],
+  //     _p_d_enc_wei[_weight_offset + 5], _max_thread_per_block, _tw._is_post_ln);
+  ker_residual_launcher<_DataType>(_batch_token_num, _tw._hidden_size, _stream, _p_d_output, 
+  _p_d_q, _p_d_enc_wei[_weight_offset + 5], _max_thread_per_block);
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_output, "_p_d_ouput：", 10);
+  print_vec(_p_d_q, "layer norm out(head): ", 10);
+#endif
+
 
   /* ---step 1. qkv = ori_q * qkv_wei + bias, and reshape qkv for multi-head
    * gemm--- */
@@ -222,6 +229,9 @@ void Encoder<OpType_>::self_attention() {
       _tw._hidden_size, _p_d_v, _BType, _tw._hidden_size, &_fone, _p_d_output,
       _CType, _tw._hidden_size, _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_output, "attn output", 10);
+#endif
   return;
 }
 
