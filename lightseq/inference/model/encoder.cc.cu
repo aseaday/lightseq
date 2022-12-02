@@ -146,9 +146,9 @@ void Encoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
   }
 
   // last layer norm
-  ker_norm_layer_launcher<_DataType>(
-      _batch_token_num, _tw._hidden_size, _stream, _p_d_output,
-      _p_d_src_emb_wei[2], _p_d_src_emb_wei[3], _max_thread_per_block);
+  // ker_norm_layer_launcher<_DataType>(
+  //     _batch_token_num, _tw._hidden_size, _stream, _p_d_output,
+  //     _p_d_src_emb_wei[2], _p_d_src_emb_wei[3], _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
@@ -231,6 +231,10 @@ void Encoder<OpType_>::self_attention() {
       _tw._hidden_size, _p_d_v, _BType, _tw._hidden_size, &_fone, _p_d_output,
       _CType, _tw._hidden_size, _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
+  ker_norm_layer_launcher<_DataType>(
+      _batch_token_num, _tw._hidden_size, _stream, _p_d_output,
+      _p_d_enc_wei[_weight_offset], _p_d_enc_wei[_weight_offset + 1], _max_thread_per_block);
+
 #ifdef DEBUG_RESULT
   print_vec(_p_d_output, "attn output", 10);
 #endif
@@ -240,11 +244,13 @@ void Encoder<OpType_>::self_attention() {
 template <OperationType OpType_>
 void Encoder<OpType_>::ffn_add_norm() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
-  ker_norm_layer_resual_launcher<_DataType>(
-      _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_ffn_buf1,
-      _p_d_enc_wei[_weight_offset + 6], _p_d_enc_wei[_weight_offset + 7],
-      _p_d_enc_wei[_weight_offset + 11], _max_thread_per_block,
-      _tw._is_post_ln);
+  // ker_norm_layer_resual_launcher<_DataType>(
+  //     _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_ffn_buf1,
+  //     _p_d_enc_wei[_weight_offset + 6], _p_d_enc_wei[_weight_offset + 7],
+  //     _p_d_enc_wei[_weight_offset + 11], _max_thread_per_block,
+  //     _tw._is_post_ln);
+  ker_residual_launcher<_DataType>(_batch_token_num, _tw._hidden_size, _stream, _p_d_output, 
+  _p_d_ffn_buf1, _p_d_enc_wei[_weight_offset +11], _max_thread_per_block, _alpha);
   /* ---step 1. first ffn layer--- */
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._inner_size, _batch_token_num,
@@ -269,6 +275,14 @@ void Encoder<OpType_>::ffn_add_norm() {
       _p_d_output, _CType, _tw._hidden_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
+  /* ---step 3. layer norm */
+  ker_norm_layer_launcher<_DataType>(
+      _batch_token_num, _tw._hidden_size, _stream, _p_d_output,
+      _p_d_enc_wei[_weight_offset + 6], _p_d_enc_wei[_weight_offset + 7], _max_thread_per_block);
+
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_output, "ffn output", 10);
+#endif
   return;
 }
 
