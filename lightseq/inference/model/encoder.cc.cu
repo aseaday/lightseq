@@ -31,6 +31,7 @@ Encoder<OpType_>::Encoder(int max_batch_size, int *p_d_token_id,
       _fone((_DataType)1.f),
       _fzero((_DataType)0.f),
 
+      _alpha((0.81 * pow(pow(tw._n_enc_layer, 4) * tw._n_dec_layer, 0.0625))),
       _atten_scaler((_DataType)sqrt(1.f / tw._dim_per_head)),
       _max_batch_dim(max_batch_size * tw._max_step * tw._hidden_size),
       _max_thread_per_block(1024) {}
@@ -114,6 +115,7 @@ void Encoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
   _batch_seq_len = batch_seq_len;
   _batch_token_num = batch_size * batch_seq_len;
 #ifdef DEBUG_RESULT
+  std::cout << "encoder_alpha:" << (float)_alpha << std::endl;
   std::cout << "batch_size-" << batch_size << " batch_seq_len-" << batch_seq_len
             << std::endl;
   print_vec(_p_d_token_id, "batch_token_ids", batch_size * batch_seq_len);
@@ -172,7 +174,7 @@ void Encoder<OpType_>::self_attention() {
   //     _p_d_enc_wei[_weight_offset], _p_d_enc_wei[_weight_offset + 1],
   //     _p_d_enc_wei[_weight_offset + 5], _max_thread_per_block, _tw._is_post_ln);
   ker_residual_launcher<_DataType>(_batch_token_num, _tw._hidden_size, _stream, _p_d_output, 
-  _p_d_q, _p_d_enc_wei[_weight_offset + 5], _max_thread_per_block);
+  _p_d_q, _p_d_enc_wei[_weight_offset + 5], _max_thread_per_block, _alpha);
 #ifdef DEBUG_RESULT
   print_vec(_p_d_output, "_p_d_ouput：", 10);
   print_vec(_p_d_q, "layer norm out(head): ", 10);

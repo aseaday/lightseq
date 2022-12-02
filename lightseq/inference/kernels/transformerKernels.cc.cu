@@ -543,18 +543,18 @@ residual_bias: [hidden_size]
 */
 template <typename T>
 __global__ void ker_residual(T* input, T* output, 
-                      const T* residual_bias, const int hidden_size) {
+                      const T* residual_bias, const int hidden_size, const float alpha) {
   uint block_start = blockIdx.x * hidden_size;
   uint start = block_start + threadIdx.x;
   uint end = block_start + hidden_size;
   for (uint i = start; i < end; i += blockDim.x) {
     output[i] = input[i];
-    input[i] += __ldg(&residual_bias[i - block_start]);
+    input[i] = (T)alpha * input[i] + __ldg(&residual_bias[i - block_start]);
   }
 }
 template <>
 __global__ void ker_residual<__half>(__half* input, __half* output, 
-                      const __half* residual_bias, const int hidden_size) {
+                      const __half* residual_bias, const int hidden_size, const float alpha) {
   uint block_start = blockIdx.x * hidden_size;
   uint start = block_start + threadIdx.x;
   uint end = block_start + hidden_size;
@@ -567,31 +567,31 @@ __global__ void ker_residual<__half>(__half* input, __half* output,
     float2 new_input_f2;
     float2 residual_bias_val =
         __half22float2(__ldg(&presidual_bias[i - block_start]));
-    new_input_f2.x = local_f2.x + residual_bias_val.x;
-    new_input_f2.y = local_f2.y + residual_bias_val.y;
+    new_input_f2.x = alpha * local_f2.x + residual_bias_val.x;
+    new_input_f2.y = alpha * local_f2.y + residual_bias_val.y;
     pinput[i] = __float22half2_rn(new_input_f2);
   }
 }
 template <typename T>
 void ker_residual_launcher(int token_num, int hidden_size,
                                     cudaStream_t stream, T* input, T* output, 
-                                    const T* residual_bias, const int max_thread_per_block) {
-  ker_residual<T><<<token_num, max_thread_per_block, 0, stream>>>(input, output, residual_bias, hidden_size);
+                                    const T* residual_bias, const int max_thread_per_block, const float alpha) {
+  ker_residual<T><<<token_num, max_thread_per_block, 0, stream>>>(input, output, residual_bias, hidden_size, alpha);
 }
 template <>
 void ker_residual_launcher(int token_num, int hidden_size,
                                     cudaStream_t stream, __half* input, __half* output, 
-                                    const __half* residual_bias, const int max_thread_per_block) {
-  ker_residual<__half><<<token_num, max_thread_per_block, 0, stream>>>(input, output, residual_bias, hidden_size / 2);
+                                    const __half* residual_bias, const int max_thread_per_block, const float alpha) {
+  ker_residual<__half><<<token_num, max_thread_per_block, 0, stream>>>(input, output, residual_bias, hidden_size / 2, alpha);
 }
 template
 void ker_residual_launcher<float>(int token_num, int hidden_size,
                                     cudaStream_t stream, float* input, float* output,
-                                    const float* residual_bias, const int max_thread_per_block);
+                                    const float* residual_bias, const int max_thread_per_block, const float alpha);
 template
 void ker_residual_launcher<__half>(int token_num, int hidden_size,
                                     cudaStream_t stream, __half* input, __half* output,
-                                    const __half* residual_bias, const int max_thread_per_block);
+                                    const __half* residual_bias, const int max_thread_per_block, const float alpha);
 /**
 @brief: ker_norm_layer_resual
 layer normalization, and add an residual_bias to input

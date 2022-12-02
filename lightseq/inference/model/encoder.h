@@ -50,6 +50,8 @@ class Encoder {
   const _DataType _fzero;
 
   const _DataType _atten_scaler;
+  // const _DataType _alpha;
+  const float _alpha;
   const int _max_batch_dim;
   const int _max_thread_per_block;
 
