@@ -348,10 +348,13 @@ void Decoder<OpType_>::project_encoder_output() {
   int kv_dim = _tw._hidden_size * 2 * _tw._n_dec_layer;
 #ifdef DEBUG_RESULT
   CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  std::cout << "batch_token_num:" << _batch_token_num;
   print_vec(_p_d_encoder_output, "_p_d_encoder_output(head):", 5);
+  print_vec(_p_d_encoder_output + _tw._hidden_size, "_p_d_encoder_output(mid):", 5);
   print_vec(_p_d_encoder_output + _batch_token_num * _tw._hidden_size - 5,
             "_p_d_encoder_output(tail)", 5);
   print_vec(_p_d_trg_emb_wei[4], "encoder project(head):", 10);
+  print_vec(_p_d_trg_emb_wei[5], "encoder project (bias):", 10);
 #endif
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, kv_dim, _batch_token_num, _tw._hidden_size,
@@ -364,15 +367,16 @@ void Decoder<OpType_>::project_encoder_output() {
 #ifdef DEBUG_RESULT
   CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
   print_vec(_p_d_encoder_out_buf, "encoder out(head):", 5);
-  print_vec(_p_d_encoder_out_buf +
-                _batch_token_num * _tw._hidden_size * _tw._n_dec_layer - 5,
-            "encoder out(tail):", 5);
 #endif
   ker_arrange_encdec_kv_launcher<_DataType>(
       _batch_token_num, _tw._n_dec_layer, _tw._hidden_size, _stream,
       _p_d_encoder_out_buf, _p_d_trg_emb_wei[5], _p_d_encdec_k_bgeem[0],
       _p_d_encdec_v_bgeem[0], _layer_size_encdec_k, _batch_seq_len,
       _tw._dim_per_head, _tw._head_num, _max_thread_per_block);
+#ifdef DEBUG_RESULT
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  print_vec(_p_d_encdec_k_bgeem[0], "encdec k out(head):", 5);
+#endif
   return;
 }
 
@@ -433,6 +437,8 @@ void Decoder<OpType_>::embedding() {
                             _tw._hidden_size, _tw._trg_vocab_size, _cur_step,
                             _tw._max_step, _tw._multilg_type, _stream);
 #ifdef DEBUG_RESULT
+  print_vec(_p_d_trg_emb_wei[0], "decode token embedding weight", 10);
+  print_vec(_p_d_trg_emb_wei[1], "decode position embedding weight", 10);
   for (int i = 0; i < _batch_size; i++) {       // batch_id
     for (int j = 0; j < _tw._beam_size; j++) {  // beam_id
       std::cout << "decoder emb: batch-" << i << ", beam-" << j << std::endl;
