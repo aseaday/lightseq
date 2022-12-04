@@ -38,6 +38,7 @@ Decoder<OpType_>::Decoder(int max_batch_size, const int* p_d_padding_mask,
                          tw._beam_size),
       _type_one(1.f),
       _type_zero(0.f),
+      _alpha(pow(3 * tw._n_dec_layer, 0.25)),
       _fzero(0.f),
       _atten_scaler(sqrt(1.f / tw._dim_per_head)),
       _logit_scaler(_tw._no_scale_embedding ? 1.f
@@ -444,7 +445,10 @@ void Decoder<OpType_>::embedding() {
       std::cout << "decoder emb: batch-" << i << ", beam-" << j << std::endl;
       print_vec(_p_d_cur_step_query + i * _tw._beam_size * _tw._hidden_size +
                     j * _tw._hidden_size,
-                "emb", 10);
+                "emb(head)", 10);
+      print_vec(_p_d_cur_step_query + i * _tw._beam_size * _tw._hidden_size +
+                    j * _tw._hidden_size + _tw._hidden_size - 10,
+                "emb(tail)", 10);
     }
   }
 #endif
@@ -474,9 +478,9 @@ void Decoder<OpType_>::decoder_stack() {
   }
 
   // last layer norm
-  ker_norm_layer_launcher<_DataType>(
-      _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
-      _p_d_trg_emb_wei[2], _p_d_trg_emb_wei[3], _max_thread_per_block);
+  // ker_norm_layer_launcher<_DataType>(
+  //     _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
+  //     _p_d_trg_emb_wei[2], _p_d_trg_emb_wei[3], _max_thread_per_block);
   return;
 }
 
@@ -486,17 +490,19 @@ Decoder self attention
 template <OperationType OpType_>
 void Decoder<OpType_>::self_attention() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
-  ker_norm_layer_resual_launcher<_DataType>(
-      _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
-      _p_d_query_buf1, _p_d_dec_wei[_weight_offset],
-      _p_d_dec_wei[_weight_offset + 1], _p_d_dec_wei[_weight_offset + 5],
-      _max_thread_per_block, _tw._is_post_ln);
+//   ker_norm_layer_resual_launcher<_DataType>(
+//       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
+//       _p_d_query_buf1, _p_d_dec_wei[_weight_offset],
+//       _p_d_dec_wei[_weight_offset + 1], _p_d_dec_wei[_weight_offset + 5],
+//       _max_thread_per_block, _tw._is_post_ln);
 
-#ifdef DEBUG_RESULT
-  print_vec(_p_d_query_buf1, "self attn ln(head): ", 5);
-  print_vec(_p_d_query_buf1 + _step_token_num * _tw._hidden_size - 5,
-            "self attn ln(tail): ", 5);
-#endif
+// #ifdef DEBUG_RESULT
+//   print_vec(_p_d_query_buf1, "self attn ln(head): ", 5);
+//   print_vec(_p_d_query_buf1 + _step_token_num * _tw._hidden_size - 5,
+//             "self attn ln(tail): ", 5);
+// #endif
+  ker_residual_launcher<_DataType>(_step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query, 
+  _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 5], _max_thread_per_block, _alpha);
 
   /* ---step 1. qkv = ori_q * qkv_wei + bias, and reshape qkv for multi-head
    * gemm--- */
@@ -583,6 +589,9 @@ void Decoder<OpType_>::self_attention() {
       _tw._hidden_size, _p_d_query_buf1, _BType, _tw._hidden_size, &_type_one,
       _p_d_cur_step_query, _CType, _tw._hidden_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+  ker_norm_layer_launcher<_DataType>(
+      _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
+      _p_d_dec_wei[_weight_offset], _p_d_dec_wei[_weight_offset + 1], _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_cur_step_query, "self attn out(head): ", 3);
@@ -597,17 +606,19 @@ Encode-Decoder attention
 template <OperationType OpType_>
 void Decoder<OpType_>::encdec_attention() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
-  ker_norm_layer_resual_launcher<_DataType>(
-      _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
-      _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 6],
-      _p_d_dec_wei[_weight_offset + 7], _p_d_dec_wei[_weight_offset + 11],
-      _max_thread_per_block, _tw._is_post_ln);
+//   ker_norm_layer_resual_launcher<_DataType>(
+//       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
+//       _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 6],
+//       _p_d_dec_wei[_weight_offset + 7], _p_d_dec_wei[_weight_offset + 11],
+//       _max_thread_per_block, _tw._is_post_ln);
 
-#ifdef DEBUG_RESULT
-  print_vec(_p_d_query_buf1, "encdec attn ln(head): ", 5);
-  print_vec(_p_d_query_buf1 + _step_token_num * _tw._hidden_size - 5,
-            "encdec attn ln(tail): ", 5);
-#endif
+// #ifdef DEBUG_RESULT
+//   print_vec(_p_d_query_buf1, "encdec attn ln(head): ", 5);
+//   print_vec(_p_d_query_buf1 + _step_token_num * _tw._hidden_size - 5,
+//             "encdec attn ln(tail): ", 5);
+// #endif
+  ker_residual_launcher<_DataType>(_step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query, 
+  _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 11], _max_thread_per_block, _alpha);
 
   /* ---step 1. new_q = ori_q * q_wei + bias, reshape new_q for multi-head
    * gemm--- */
@@ -657,6 +668,9 @@ void Decoder<OpType_>::encdec_attention() {
       _tw._hidden_size, _p_d_query_buf2, _BType, _tw._hidden_size, &_type_one,
       _p_d_cur_step_query, _CType, _tw._hidden_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+  ker_norm_layer_launcher<_DataType>(
+      _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
+      _p_d_dec_wei[_weight_offset + 6], _p_d_dec_wei[_weight_offset + 7], _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
   CHECK_GPU_ERROR(cudaGetLastError());
@@ -670,11 +684,13 @@ void Decoder<OpType_>::encdec_attention() {
 template <OperationType OpType_>
 void Decoder<OpType_>::ffn_add_norm() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
-  ker_norm_layer_resual_launcher<_DataType>(
-      _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
-      _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 12],
-      _p_d_dec_wei[_weight_offset + 13], _p_d_dec_wei[_weight_offset + 17],
-      _max_thread_per_block, _tw._is_post_ln);
+  // ker_norm_layer_resual_launcher<_DataType>(
+  //     _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
+  //     _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 12],
+  //     _p_d_dec_wei[_weight_offset + 13], _p_d_dec_wei[_weight_offset + 17],
+  //     _max_thread_per_block, _tw._is_post_ln);
+  ker_residual_launcher<_DataType>(_step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query, 
+  _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 17], _max_thread_per_block, _alpha);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_query_buf1, "ffn ln(head): ", 5);
@@ -707,6 +723,9 @@ void Decoder<OpType_>::ffn_add_norm() {
       _tw._hidden_size, _p_d_query_buf2, _BType, _tw._inner_size, &_type_one,
       _p_d_cur_step_query, _CType, _tw._hidden_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+  ker_norm_layer_launcher<_DataType>(
+      _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
+      _p_d_dec_wei[_weight_offset + 12], _p_d_dec_wei[_weight_offset + 13], _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_cur_step_query, "ffn ln(head): ", 5);

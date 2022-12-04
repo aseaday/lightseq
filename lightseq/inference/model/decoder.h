@@ -119,6 +119,7 @@ class Decoder {
   const _DataType _type_one;
   const _DataType _type_zero;
 
+  const float _alpha;
   const float _fzero;
   const _DataType
       _atten_scaler;          // scaling factor of Scaled Dot-Product Attention
