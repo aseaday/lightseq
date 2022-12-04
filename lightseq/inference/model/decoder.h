@@ -113,6 +113,7 @@ class Decoder {
   bool _is_benchmark;
 
   const std::vector<const _DataType*>& _p_d_trg_emb_wei;  // size: 7
+  const std::vector<const _DataType*>& _p_d_sftmx_emb_wei;  // size: 1
   const std::vector<const _DataType*>&
       _p_d_dec_wei;  // size: 18 * dec_layer_num
 

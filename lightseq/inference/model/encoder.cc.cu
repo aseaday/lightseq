@@ -189,6 +189,9 @@ void Encoder<OpType_>::self_attention() {
       _tw._hidden_size * 3, _p_d_q, _BType, _tw._hidden_size, &_fzero,
       _p_d_qkv_projected, _CType, _tw._hidden_size * 3, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_qkv_projected, "_p_d_qkv_projected", 10);
+#endif
   // get q, k, v by split and reshape qkv
   ker_arrange_encself_qkv_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_qkv_projected,

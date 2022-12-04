@@ -27,6 +27,7 @@ Decoder<OpType_>::Decoder(int max_batch_size, const int* p_d_padding_mask,
       _p_d_encoder_output(p_d_encoder_output),
       _p_d_result(p_d_result),
       _p_d_trg_emb_wei(tw.get_trg_emb_wei()),
+      _p_d_sftmx_emb_wei(tw.get_sftmx_emb_wei()),
       _p_d_dec_wei(tw.get_dec_wei()),
       _tw(tw),
       _stream(stream),
@@ -392,7 +393,7 @@ bool Decoder<OpType_>::run_step() {
 
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._trg_vocab_size, _step_token_num,
-      _tw._hidden_size, &_logit_scaler, _p_d_trg_emb_wei[0], _AType,
+      _tw._hidden_size, &_logit_scaler, _p_d_sftmx_emb_wei[0], _AType,
       _tw._trg_vocab_size, _p_d_cur_step_query, _BType, _tw._hidden_size,
       // &_type_zero, _p_d_logit_buf, _CType, _tw._trg_vocab_size, _computeType,
       &_fzero, _p_d_logit_buf, _CType, _tw._trg_vocab_size, CUDA_R_32F,

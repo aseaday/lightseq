@@ -120,5 +120,6 @@ message Transformer {
   repeated EncoderLayer encoder_stack = 2;  // encoder weights
   EmbeddingLayer trg_embedding = 3;         // target embedding
   repeated DecoderLayer decoder_stack = 4;  // decoder weighs
-  ModelConf model_conf = 5;                 // model_config
+  EmbeddingLayer softmax_embedding = 5;     // softmax_embedding
+  ModelConf model_conf = 6;                 // model_config
 }

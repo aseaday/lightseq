@@ -551,6 +551,38 @@ void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
   }
 }
 
+template <OperationType OpType_>
+void TransformerWeight<OpType_>::hdf5_parse_softmax_emb_wei(hid_t hdf5_file) {
+  int vocab_size = _trg_vocab_size;
+
+  std::string dataset_prefix = "softmax_embedding";
+  size_t value_size =
+      vocab_size * _hidden_size + _max_step * _hidden_size + 2 * _hidden_size;
+
+  std::vector<int> offset;
+  std::vector<float> value(value_size);  // preallocate vector for performance
+  std::cout << "loading " << value_size * sizeof(OpType_) / (1024 * 1024)
+            << " MB of embedding weight." << std::endl;
+  int idx = 0;
+
+  offset.push_back(idx);
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/token_embedding", H5T_NATIVE_FLOAT,
+      value.data() + idx,
+      [=](int size) { return size != vocab_size * _hidden_size; },
+      "Wrong token_embedding_size !");
+  idx += vocab_size * _hidden_size;
+
+
+  std::vector<_DataType> raw_value;
+  raw_value.reserve(value.size());
+  for (float e : value) raw_value.push_back(float2required(e));
+  _d_sftmx_emb_wei = raw_value;
+  for (int e : offset)
+    _p_d_sftmx_emb_wei.push_back(
+        thrust::raw_pointer_cast(_d_sftmx_emb_wei.data()) + e);
+}
+
 /**
 Load the weights of embedding layer into GPU memory.
 Compared with the encoder, the decoder has more
@@ -1037,6 +1069,7 @@ std::string TransformerWeight<OpType_>::initializing(std::string weight_path,
     if (!only_decoder) {
       hdf5_parse_enc_wei(hdf5_file);
     }
+    hdf5_parse_softmax_emb_wei(hdf5_file);
     hdf5_parse_dec_wei(hdf5_file);
     H5Fclose(hdf5_file);
 

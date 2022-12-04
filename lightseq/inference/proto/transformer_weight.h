@@ -40,18 +40,21 @@ class TransformerWeight {
   // parsing function for hdf5
   void hdf5_get_model_config(hid_t hdf5_file, bool only_decoder = false);
   void hdf5_parse_emb_wei(hid_t hdf5_file, std::string source);
+  void hdf5_parse_softmax_emb_wei(hid_t hdf5_file);
   void hdf5_parse_enc_wei(hid_t hdf5_file);
   void hdf5_parse_dec_wei(hid_t hdf5_file);
 
   // store the weights pointer
   std::vector<const _DataType *> _p_d_src_emb_wei;  // size: 4
   std::vector<const _DataType *> _p_d_trg_emb_wei;  // size: 4
+  std::vector<const _DataType *> _p_d_sftmx_emb_wei;  // size: 4
   std::vector<const _DataType *> _p_d_enc_wei;      // size: 12 * enc_layer_num
   std::vector<const _DataType *> _p_d_dec_wei;      // size: 18 * dec_layer_num
 
   // store the weights on gpu memo
   thrust::device_vector<_DataType> _d_src_emb_wei;
   thrust::device_vector<_DataType> _d_trg_emb_wei;
+  thrust::device_vector<_DataType> _d_sftmx_emb_wei;
   thrust::device_vector<_DataType> _d_enc_wei;
   thrust::device_vector<_DataType> _d_dec_wei;
   thrust::device_vector<_DataType> _d_src_lang_emb;
@@ -59,6 +62,11 @@ class TransformerWeight {
 
  public:
   std::string initializing(std::string proto_path, bool only_decoder = false);
+
+  const std::vector<const _DataType *> &get_sftmx_emb_wei() const {
+    // {token_emb}
+    return _p_d_sftmx_emb_wei;
+  }
 
   const std::vector<const _DataType *> &get_src_emb_wei() const {
     // {token_emb, pos_emb, norm_scale, norm_bias}
